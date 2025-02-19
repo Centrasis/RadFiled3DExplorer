@@ -1,8 +1,7 @@
-from RadFiled3D.RadFiled3D import FieldStore, CartesianRadiationField, RadiationFieldMetadata
+from RadFiled3D.RadFiled3D import FieldStore, CartesianRadiationField, RadiationFieldMetadata, RadiationFieldMetadataHeaderV1
 import plotly.graph_objs as go
 import numpy as np
 import torch
-import re
 import os
 from enum import Enum
 from typing import Union
@@ -72,14 +71,22 @@ class RadSimPlotter:
         self.plot_components = FieldComponent.All
 
     def parse_dataset(self, path: str) -> np.ndarray:
-        pattern = re.compile(r"RF_([\-\+\d\.]+)keV_([\-\+\d\.]+)_([\-\+\d\.]+)_([^\.]+).rf3")
-        matches = [pattern.match(f) for f in os.listdir(path) if f.endswith(".rf3")]
+        metadata = [FieldStore.peek_metadata(f) for f in os.listdir(path) if f.endswith(".rf3")]
 
-        stats = np.zeros((len(matches), 3), dtype=np.float32)
-        for i, m in enumerate(matches):
-            stats[i, 0] = float(m[1])
-            stats[i, 1] = float(m[2])
-            stats[i, 2] = float(m[3])
+        stats = np.zeros((len(metadata), 3), dtype=np.float32)
+        for i, m in enumerate(metadata):
+            m: RadiationFieldMetadataHeaderV1 = m
+
+            # calc alpha and beta angle of polar rotation from direction vector
+            direction = m.simulation.tube.radiation_direction
+            alpha_angle = np.arctan2(direction.y, direction.x)
+            beta_angle = np.arccos(direction.z)
+            alpha_angle = np.degrees(alpha_angle)
+            beta_angle = np.degrees(beta_angle)
+
+            stats[i, 0] = m.simulation.tube.max_energy_eV / 1000.0
+            stats[i, 1] = alpha_angle
+            stats[i, 2] = beta_angle
 
         return stats
 
@@ -232,7 +239,7 @@ class RadSimPlotter:
             particles = metadata.get_header().simulation.primary_particle_count
 
         fig.update_layout(
-            title=f"{title} @ {particles} particles",
+            title=f"{title} @ {particles:2e} particles",
             scene=dict(
                 xaxis_title='x in m',
                 yaxis_title='y in m',
