@@ -177,8 +177,9 @@ class RadSimPlotter:
         if self.plot_infos != PlotInformation.Direction:
             data = self.normalize(data)
         data = torch.nan_to_num(data, nan=0.0, posinf=1e+304, neginf=-1e+304)
-        x = np.arange(data.shape[0])
-        y = np.arange(data.shape[1])
+        field_dim = field.get_field_dimensions()
+        x = np.linspace(0, field_dim.x, data.shape[0]) - field_dim.x / 2.0
+        y = np.linspace(0, field_dim.z, data.shape[1]) - field_dim.z / 2.0
         x, y = np.meshgrid(x, y)
 
         if self.plot_infos != PlotInformation.Direction:
