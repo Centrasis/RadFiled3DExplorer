@@ -1,4 +1,4 @@
-from RadFiled3D.RadFiled3D import FieldStore, CartesianRadiationField, RadiationFieldMetadata, RadiationFieldMetadataHeaderV1
+from RadFiled3D.RadFiled3D import FieldStore, CartesianRadiationField, PolarRadiationField, RadiationFieldMetadataHeaderV1, RadiationFieldMetadata
 import plotly.graph_objs as go
 import numpy as np
 import torch
@@ -113,14 +113,17 @@ class RadSimPlotter:
 
         return fig
 
-    def get_data(self, field: CartesianRadiationField) -> np.ndarray:
+    def get_data(self, field: Union[CartesianRadiationField, PolarRadiationField]) -> np.ndarray:
         layer_names: list[str] = self.plot_infos.get_keys()
         component_names: list[str] = self.plot_components.get_keys()
 
         overall_data = None
         for component in component_names:
             if component not in field.get_channel_names():
-                raise ValueError(f"Field does not contain component {component}")
+                if self.plot_components != FieldComponent.All:
+                    raise ValueError(f"Field does not contain component {component}")
+                else:
+                    continue
             layers_data = None
             for layer in layer_names:
                 if layer not in field.get_channel(component).get_layers():
@@ -155,17 +158,9 @@ class RadSimPlotter:
             data = torch.from_numpy(data)
         data = self.norm.forward(data)
         return data
-
-    def plot_field(self, field: CartesianRadiationField, dpi: int = 96, title: str = "", metadata: RadiationFieldMetadata = None, vertical_slice_height: float = None) -> go.Figure:
+    
+    def plot_cartesian_field(self, field: CartesianRadiationField, dpi: int = 96, title: str = "", metadata: RadiationFieldMetadata = None, vertical_slice_height: float = None) -> go.Figure:
         data = torch.from_numpy(self.get_data(field))
-
-        #conv3d = nn.Conv3d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1)
-        #conv3d.weight.data.fill_(1.0)
-        #conv3d.bias.data.fill_(0.0)
-        #data = data.unsqueeze(0).unsqueeze(0)
-        #data = conv3d(data)
-        #data = data.squeeze(0).squeeze(0).detach()
-
         if vertical_slice_height is not None:
             data = data[:, int(data.shape[1] * vertical_slice_height), :].squeeze(1)
         else:
@@ -267,5 +262,45 @@ class RadSimPlotter:
                 marker=dict(size=2, color='red'),
                 line=dict(color='blue', dash='dot')
             ))
+        return fig
+    
+    def plot_polar_field(self, field: PolarRadiationField, dpi: int = 96, title: str = "", metadata: RadiationFieldMetadata = None) -> go.Figure:
+        data = torch.from_numpy(self.get_data(field))
+        data = torch.sum(data, dim=-1)
+        data = self.normalize(data)
+        data = torch.nan_to_num(data, nan=0.0, posinf=1e+304, neginf=-1e+304)
+        x = np.linspace(0, 2 * np.pi, data.shape[0])
+        y = np.linspace(0, 2 * np.pi, data.shape[1])
+        x = np.degrees(x)
+        y = np.degrees(y)
+
+        fig = go.Figure(data=[go.Heatmap(z=data.numpy(), x=x, y=y, colorscale='plasma')])
+        fig.update_layout(
+            title=title,
+            scene=dict(
+                xaxis_title='alpha in °',
+                yaxis_title='beta in °',
+                zaxis_title=f'{self.norm._get_name()}(z)'
+            )
+        )
+
+        if self.show_direction and metadata is not None:
+            pass
 
         return fig
+
+    def plot_field(self, field: Union[CartesianRadiationField, PolarRadiationField], dpi: int = 96, title: str = "", metadata: RadiationFieldMetadata = None, vertical_slice_height: float = None) -> go.Figure:
+        #conv3d = nn.Conv3d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1)
+        #conv3d.weight.data.fill_(1.0)
+        #conv3d.bias.data.fill_(0.0)
+        #data = data.unsqueeze(0).unsqueeze(0)
+        #data = conv3d(data)
+        #data = data.squeeze(0).squeeze(0).detach()
+
+        type_name = field.get_typename()
+        if type_name == "CartesianRadiationField":
+            return self.plot_cartesian_field(field, dpi, title, metadata, vertical_slice_height)
+        elif type_name == "PolarRadiationField":
+            return self.plot_polar_field(field, dpi, title, metadata)
+        else:
+            raise ValueError(f"Unsupported field type {type_name}")
