@@ -75,7 +75,7 @@ class RadSimPlotter:
 
         stats = np.zeros((len(metadata), 3), dtype=np.float32)
         for i, m in enumerate(metadata):
-            m: RadiationFieldMetadataHeaderV1 = m
+            m: RadiationFieldMetadataHeaderV1 = m.get_header() if isinstance(m, RadiationFieldMetadata) else m
 
             # calc alpha and beta angle of polar rotation from direction vector
             direction = m.simulation.tube.radiation_direction
