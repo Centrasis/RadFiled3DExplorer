@@ -21,6 +21,7 @@ setup(
    install_requires=[
        "plotly",
        "dash",
+       "torch",
        "dash-bootstrap-components",
        "RadFiled3D",
        "numpy",
