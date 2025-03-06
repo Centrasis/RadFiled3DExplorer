@@ -269,23 +269,25 @@ class RadSimPlotter:
         data = torch.sum(data, dim=-1)
         data = self.normalize(data)
         data = torch.nan_to_num(data, nan=0.0, posinf=1e+304, neginf=-1e+304)
-        x = np.linspace(0, 2 * np.pi, data.shape[0])
-        y = np.linspace(0, 2 * np.pi, data.shape[1])
-        x = np.degrees(x)
-        y = np.degrees(y)
+        
+        theta = np.linspace(0, 2 * np.pi, data.shape[0])
+        phi = np.linspace(0, np.pi, data.shape[1])
+        theta, phi = np.meshgrid(theta, phi)
 
-        fig = go.Figure(data=[go.Heatmap(z=data.numpy(), x=x, y=y, colorscale='plasma')])
+        x = np.sin(phi) * np.cos(theta)
+        y = np.sin(phi) * np.sin(theta)
+        z = np.cos(phi)
+        
+        fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=data.numpy(), colorscale='plasma')])
+        
         fig.update_layout(
             title=title,
             scene=dict(
-                xaxis_title='alpha in °',
-                yaxis_title='beta in °',
-                zaxis_title=f'{self.norm._get_name()}(z)'
+                xaxis_title='X',
+                yaxis_title='Y',
+                zaxis_title='Z'
             )
         )
-
-        if self.show_direction and metadata is not None:
-            pass
 
         return fig
 
