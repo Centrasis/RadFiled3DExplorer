@@ -3,15 +3,13 @@ from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output, State
 from .PlotFrame import PlotFrame
-from .RadSimPlotter import RadSimPlotter, PlotInformation, Noop, FieldComponent
+from .RadSimPlotter import RadSimPlotter, PlotInformation, MaxNorm, Noop, LogNorm, ClampingMaxNorm, FieldComponent
 from typing import Tuple, Deque, Callable
 from collections import deque
 import os
 from threading import Thread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from ptbDataLab.normalizations.log_norm import LogNorm
-from ptbDataLab.normalizations.linear_norm import LinearNorm
 import plotly.graph_objs as go
 import dash_bootstrap_components as dbc
 import webview
@@ -129,6 +127,19 @@ class MainWindow(FileSystemEventHandler):
         def update_data_display_area(tab):
             if tab == 'files':
                 return html.Div([
+                    dcc.Dropdown(
+                        id='normalization-selection',
+                        options=[
+                            {'label': 'Noop', 'value': 'Noop'},
+                            {'label': 'MaxNorm', 'value': 'MaxNorm'},
+                            {'label': 'LogNorm', 'value': 'LogNorm'},
+                            {'label': 'ClampingMaxNorm', 'value': 'ClampingMaxNorm'}
+                        ],
+                        searchable=False,
+                        clearable=False,
+                        value='Noop',
+                        style={'width': '5vw', 'justify-content': 'right', 'align-items': 'right', 'display': 'flex', 'height': '5vh', 'float': 'left'}
+                    ),
                     dcc.RadioItems(
                         id='layer-selection',
                         options=[
@@ -287,10 +298,10 @@ class MainWindow(FileSystemEventHandler):
                 Input('enable-vertical-slicing', 'value'),
                 Input('prev-btn', 'n_clicks'),
                 Input('next-btn', 'n_clicks'),
-                #Input({'type': 'file-list-item', 'index': dash.dependencies.ALL}, 'n_clicks'),
+                Input('normalization-selection', 'value')
             ]
         )
-        def update_viewer_plot(layer_selection, component_selection, vertical_slider, enable_vertical_slicing, prev_clicks, next_clicks): # layer_selection, component_selection, vertical_slider, , selected_file
+        def update_viewer_plot(layer_selection, component_selection, vertical_slider, enable_vertical_slicing, prev_clicks, next_clicks, normalization_selection): # layer_selection, component_selection, vertical_slider, , selected_file
             if len(self.file_list) == 0:
                 return go.Figure()
             selected_file = self.file_list[self.file_idx]
@@ -320,6 +331,16 @@ class MainWindow(FileSystemEventHandler):
                     self.plotter.plot_infos = PlotInformation.Errors
                 else:
                     self.plotter.plot_infos = PlotInformation.Energy
+            if normalization_selection:
+                if normalization_selection == 'Noop':
+                    self.norm = Noop()
+                elif normalization_selection == 'MaxNorm':
+                    self.norm = MaxNorm()
+                elif normalization_selection == 'LogNorm':
+                    self.norm = LogNorm()
+                elif normalization_selection == 'ClampingMaxNorm':
+                    self.norm = ClampingMaxNorm()
+                self.plotter.norm = self.norm
             vertical_slice_height = None
             if vertical_slider:
                 vertical_slice_height = vertical_slider / 100.0

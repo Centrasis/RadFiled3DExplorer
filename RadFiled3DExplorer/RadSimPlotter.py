@@ -63,6 +63,30 @@ class MaxNorm:
         return "MaxNorm"
 
 
+class ClampingMaxNorm:
+    def forward(self, data):
+        # filter all data above the standard deviation
+        stddev = torch.std(data)
+        mean = torch.mean(data)
+        # set all data to max that is above the standard deviation
+        too_large = data > mean + stddev
+        max_allowed_value = torch.max(data[~too_large])
+        data = torch.clamp(data, max=max_allowed_value, min=0.0)
+        return data / torch.max(data)
+    
+    def _get_name(self):
+        return "ClampingMaxNorm"
+
+
+class LogNorm:
+    def forward(self, data):
+        value = torch.log(data + 1)
+        return value / torch.max(value)
+    
+    def _get_name(self):
+        return "LogNorm"
+
+
 class RadSimPlotter:
     def __init__(self, show_direction: bool = False, infos: PlotInformation = PlotInformation.Energy, norm = MaxNorm()) -> None:
         self.show_direction = show_direction
@@ -118,12 +142,14 @@ class RadSimPlotter:
         component_names: list[str] = self.plot_components.get_keys()
 
         overall_data = None
+        found_components = 0
         for component in component_names:
             if component not in field.get_channel_names():
                 if self.plot_components != FieldComponent.All:
                     raise ValueError(f"Field does not contain component {component}")
                 else:
                     continue
+            found_components += 1
             layers_data = None
             for layer in layer_names:
                 if layer not in field.get_channel(component).get_layers():
@@ -145,7 +171,7 @@ class RadSimPlotter:
             else:
                 overall_data += layers_data
         
-        overall_data /= len(component_names)
+        overall_data /= found_components
         return overall_data
 
     def load_file(self, file: str, info: PlotInformation) -> CartesianRadiationField:
@@ -266,12 +292,15 @@ class RadSimPlotter:
     
     def plot_polar_field(self, field: PolarRadiationField, dpi: int = 96, title: str = "", metadata: RadiationFieldMetadata = None) -> go.Figure:
         data = torch.from_numpy(self.get_data(field))
-        data = torch.sum(data, dim=-1)
+        if len(data.shape) > 2:
+            data = torch.sum(data, dim=-1)
         data = self.normalize(data)
         data = torch.nan_to_num(data, nan=0.0, posinf=1e+304, neginf=-1e+304)
+
+        assert len(data.shape) == 2, "Data must be 2D"
         
-        theta = np.linspace(0, 2 * np.pi, data.shape[0])
-        phi = np.linspace(0, np.pi, data.shape[1])
+        theta = np.linspace(0, 2 * np.pi, data.shape[1])
+        phi = np.linspace(0, np.pi, data.shape[0])
         theta, phi = np.meshgrid(theta, phi)
 
         x = np.sin(phi) * np.cos(theta)
