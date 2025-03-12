@@ -90,6 +90,7 @@ class LogNorm:
 class RadSimPlotter:
     def __init__(self, show_direction: bool = False, infos: PlotInformation = PlotInformation.Energy, norm = MaxNorm()) -> None:
         self.show_direction = show_direction
+        self.show_primary_radiation_direction = False
         self.plot_infos = infos
         self.norm = norm
         self.plot_components = FieldComponent.All
@@ -268,6 +269,40 @@ class RadSimPlotter:
                 zaxis_title=f'{self.norm._get_name()}(z)'
             )
         )
+
+        if self.show_primary_radiation_direction:
+            voxel_size = field.get_voxel_dimensions()
+            voxel_size = np.array([voxel_size.x, voxel_size.y, voxel_size.z], dtype=np.float32)
+            voxel_count = field.get_voxel_counts()
+            voxel_count = np.array([voxel_count.x, voxel_count.y, voxel_count.z], dtype=np.float32)
+            field_dimension = voxel_size * voxel_count
+
+            # plot a red line across the graph along the primary radiation direction
+            primary_direction_vector = metadata.get_header().simulation.tube.radiation_direction
+            primary_direction_vector = np.array([primary_direction_vector.x, primary_direction_vector.z, primary_direction_vector.y], dtype=np.float32)
+            primary_direction_vector /= np.linalg.norm(primary_direction_vector)
+            primary_direction_vector *= np.max(field_dimension / 2.0)
+            middle_z = (data.max() - data.min()) / 2.0 + data.min()
+            fig.add_trace(go.Scatter3d(
+                x=[-primary_direction_vector[0], primary_direction_vector[0]],
+                y=[-primary_direction_vector[1], primary_direction_vector[1]],
+                z=[-primary_direction_vector[2] + middle_z, primary_direction_vector[2] + middle_z],
+                mode='lines',
+                line=dict(color='red', width=6, dash='dot')
+            ))
+            # Arrow head
+            fig.add_trace(go.Cone(
+                x=[primary_direction_vector[0] - primary_direction_vector[0] * 0.125],
+                y=[primary_direction_vector[1] - primary_direction_vector[1] * 0.125],
+                z=[primary_direction_vector[2] + middle_z - primary_direction_vector[2] * 0.125],
+                u=[primary_direction_vector[0]],
+                v=[primary_direction_vector[1]],
+                w=[primary_direction_vector[2]],
+                colorscale=[[0, 'red'], [1, 'red']],
+                sizemode="absolute",
+                sizeref=0.1,
+                showscale=False
+            ))
 
         if self.show_direction and metadata is not None:
             direction = field.get_channel("scatter_field").get_layer_as_ndarray("direction")

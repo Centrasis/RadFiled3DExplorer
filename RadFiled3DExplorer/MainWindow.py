@@ -174,7 +174,8 @@ class MainWindow(FileSystemEventHandler):
                         labelStyle={'display': 'inline-block', 'margin-right': '10px'},
                         style={'width': '100%', 'justify-content': 'center', 'align-items': 'center', 'display': 'flex'}
                     ),
-                    dcc.Checklist(id='enable-vertical-slicing', options=[{'label': 'Enable vertical slicing', 'value': 'vertical-slicing'}], value=['vertical-slicing'], style={'width': '100%', 'justify-content': 'center', 'align-items': 'center', 'display': 'flex'})
+                    dcc.Checklist(id='enable-vertical-slicing', options=[{'label': 'Enable vertical slicing', 'value': 'vertical-slicing'}], value=['vertical-slicing'], style={'width': '100%', 'justify-content': 'center', 'align-items': 'center', 'display': 'flex'}),
+                    dcc.Checklist(id='show-primary-radiation-direction', options=[{'label': 'Draw primary radiation direction', 'value': 'draw-primary-radiation-direction'}], value=['draw-primary-radiation-direction'], style={'width': '100%', 'justify-content': 'center', 'align-items': 'center', 'display': 'flex'}),
                 ])
             elif tab == 'statistics':
                 return html.Div([
@@ -298,10 +299,11 @@ class MainWindow(FileSystemEventHandler):
                 Input('enable-vertical-slicing', 'value'),
                 Input('prev-btn', 'n_clicks'),
                 Input('next-btn', 'n_clicks'),
-                Input('normalization-selection', 'value')
+                Input('normalization-selection', 'value'),
+                Input('show-primary-radiation-direction', 'value')
             ]
         )
-        def update_viewer_plot(layer_selection, component_selection, vertical_slider, enable_vertical_slicing, prev_clicks, next_clicks, normalization_selection): # layer_selection, component_selection, vertical_slider, , selected_file
+        def update_viewer_plot(layer_selection, component_selection, vertical_slider, enable_vertical_slicing, prev_clicks, next_clicks, normalization_selection, show_primary_radiation_direction):
             if len(self.file_list) == 0:
                 return go.Figure()
             selected_file = self.file_list[self.file_idx]
@@ -347,6 +349,8 @@ class MainWindow(FileSystemEventHandler):
             if isinstance(enable_vertical_slicing, list):
                 if 'vertical-slicing' not in enable_vertical_slicing:
                     vertical_slice_height = None
+            if isinstance(show_primary_radiation_direction, list):
+                self.plotter.show_primary_radiation_direction = ('draw-primary-radiation-direction' in show_primary_radiation_direction)
             
             # Replace with logic to generate Plotly figure based on selected files and other inputs
             fig = self.plotter.plot_field(
