@@ -4,7 +4,7 @@ Simple Dataset Visualization Application for a folder of [RadFiled3D](https://gi
 # Getting Started
 Just install this python module by cloning this repository and calling ``pip install .`` from the repository root.
 
-Now you can execute this module by calling ``python -m RadFiled3DExplorer`` from the directory you want to display your .rf3 files stored with RadFiled3D. Currently, cartesian and polar fields are supported, but the primary beam direction can only be rendered for cartesian fiels.
+Now you can execute this module by calling ``python -m RadFiled3DExplorer`` from the directory you want to display your .rf3 files stored with RadFiled3D. Currently, cartesian and polar fields are supported, but the primary beam direction can only be rendered for cartesian fields.
 
 # Example
 When the GUI was successfully installed, you should be able to browse your dataset like this:
