@@ -448,7 +448,7 @@ class MainWindow(FileSystemEventHandler):
     def run(self):
         port = 8050
         #webview.config['use_cef'] = True
-        dash_thread = Thread(target=lambda: self.app.run_server(debug=False, port=port), daemon=True)
+        dash_thread = Thread(target=lambda: self.app.run(debug=False, port=port), daemon=True)
         dash_thread.start()
         self.window = webview.create_window("Dataset Explorer", f"http://localhost:{port}", width=1600, height=900, resizable=True, js_api=API())
         webview.start()

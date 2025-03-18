@@ -25,7 +25,9 @@ setup(
        "dash-bootstrap-components",
        "RadFiled3D",
        "numpy",
-       "watchdog"
+       "watchdog",
+       "kaleido==0.1.0",
+       "pywebview==5.4",
    ],
    python_requires='>=3.11',
    license=open("LICENSE").read(),

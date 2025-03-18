@@ -5,7 +5,6 @@ import torch
 import os
 from enum import Enum
 from typing import Union
-import torch.nn as nn
 
 
 class PlotInformation(Enum):
