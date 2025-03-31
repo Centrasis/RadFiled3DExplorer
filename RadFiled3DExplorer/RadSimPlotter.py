@@ -1,4 +1,4 @@
-from RadFiled3D.RadFiled3D import FieldStore, CartesianRadiationField, PolarRadiationField, RadiationFieldMetadataHeaderV1, RadiationFieldMetadata
+from RadFiled3D.RadFiled3D import FieldStore, HistogramVoxel, CartesianRadiationField, PolarRadiationField, RadiationFieldMetadataHeaderV1, RadiationFieldMetadata
 import plotly.graph_objs as go
 import numpy as np
 import torch
@@ -92,6 +92,7 @@ class RadSimPlotter:
         self.show_primary_radiation_direction = False
         self.plot_infos = infos
         self.norm = norm
+        self.current_field: Union[CartesianRadiationField, PolarRadiationField] = None
         self.plot_components = FieldComponent.All
 
     def parse_dataset(self, path: str) -> np.ndarray:
@@ -136,6 +137,58 @@ class RadSimPlotter:
         )
 
         return fig
+    
+    def plot_spectrum(self, xyz: tuple[float, float, float], dpi: int = 96, title: str = "") -> go.Figure:
+        if isinstance(self.current_field, PolarRadiationField):
+            return None
+        
+        xyz = [
+            xyz[0] + self.current_field.get_field_dimensions().x / 2.0,
+            xyz[1] + self.current_field.get_field_dimensions().y / 2.0,
+            xyz[2] + self.current_field.get_field_dimensions().z / 2.0 if xyz[2] is not None else self.current_field.get_field_dimensions().z / 2.0
+        ]
+
+        xyz = (
+            xyz[0],
+            xyz[2],
+            xyz[1]
+        )
+
+        if xyz[0] < 0 or xyz[0] >= self.current_field.get_field_dimensions().x or xyz[1] < 0 or xyz[1] >= self.current_field.get_field_dimensions().y or xyz[2] < 0 or xyz[2] >= self.current_field.get_field_dimensions().z:
+            print(f"Coordinates {xyz} are out of bounds")
+            return None
+        
+        component_names: list[str] = self.plot_components.get_keys()
+        hist_data: np.ndarray = None
+        voxel: HistogramVoxel = None
+        for component in component_names:
+            if hist_data is None:
+                voxel = self.current_field.get_channel(component).get_voxel_by_coord("spectrum", xyz[0], xyz[1], xyz[2])
+                hist_data = voxel.get_histogram()
+            else:
+                hist_data = hist_data + self.current_field.get_channel(component).get_voxel_by_coord("spectrum", xyz[0], xyz[1], xyz[2]).get_histogram()
+        hist_data = hist_data / len(component_names)
+        hist_data = np.nan_to_num(hist_data, nan=0.0, posinf=1.0, neginf=0.0)
+        hist_x = (np.arange(len(hist_data)) * voxel.get_histogram_bin_width() + voxel.get_histogram_bin_width()) / 1000.0
+
+        fig = go.Figure(data=[go.Bar(
+            x=hist_x,
+            y=hist_data,
+            marker_color='blue'  # Change this to match the 'plasma' colorscale
+        )])
+        
+        fig.update_layout(
+            title=title,
+            xaxis_title='Energy (keV)',
+            yaxis_title='Probability Density',
+            coloraxis_colorscale='plasma',  # Add this to match the color scheme
+            paper_bgcolor='rgba(0,0,0,0)',  # Set paper background to alpha zero
+            plot_bgcolor='rgba(0,0,0,0)',    # Set plot background to alpha zero
+            autosize=True,                   # Ensure the graph fills available space
+            margin=dict(l=0, r=0, t=50, b=0) # Adjust margins for better fit
+        )
+
+        return fig
 
     def get_data(self, field: Union[CartesianRadiationField, PolarRadiationField]) -> np.ndarray:
         layer_names: list[str] = self.plot_infos.get_keys()
@@ -164,7 +217,7 @@ class RadSimPlotter:
 
             if self.plot_infos != PlotInformation.Direction:
                 while len(layers_data.shape) > 3:
-                    layers_data = np.trapz(layers_data, axis=-1)
+                    layers_data = np.trapezoid(layers_data, axis=-1)
 
             if overall_data is None:
                 overall_data = layers_data
@@ -361,6 +414,8 @@ class RadSimPlotter:
         #data = data.unsqueeze(0).unsqueeze(0)
         #data = conv3d(data)
         #data = data.squeeze(0).squeeze(0).detach()
+
+        self.current_field = field
 
         type_name = field.get_typename()
         if type_name == "CartesianRadiationField":

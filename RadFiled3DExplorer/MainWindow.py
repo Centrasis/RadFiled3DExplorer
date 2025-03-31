@@ -15,7 +15,7 @@ import dash_bootstrap_components as dbc
 import webview
 import tkinter as tk
 from tkinter import filedialog
-from RadFiled3D.RadFiled3D import FieldStore, RadiationFieldMetadataHeaderV1
+from RadFiled3D.RadFiled3D import FieldStore, RadiationFieldMetadataHeaderV1, CartesianRadiationField
 import numpy as np
 
 
@@ -66,6 +66,8 @@ class MainWindow(FileSystemEventHandler):
             ])
         ])
 
+        self.vertical_slice_height = 0.0
+
         self.last_directories = set()
         self.dataset_path = os.path.abspath(os.getcwd())  # Default path
 
@@ -90,8 +92,21 @@ class MainWindow(FileSystemEventHandler):
                     var event = new CustomEvent('window-initialized');
                     window.dispatchEvent(event);
                 });
-            ''')
-        ], style={'height': '100vh', 'display': 'flex'})
+            '''),
+            #dcc.Graph(id='viewer-graph', style={'width': 'calc(100% - 50px)', 'height': 'inherit', 'float': 'left'}, config={'displayModeBar': False}),
+            html.Div(id='overlay', style={
+                'position': 'absolute',
+                'backgroundColor': '#2e2e2e',
+                'right': '0',
+                'top': '0',
+                'color': '#ffffff',
+                'padding': '10px',
+                'border': '1px solid #ffffff',
+                'borderRadius': '5px',
+                'display': 'none',
+                'zIndex': 1000
+            }),
+        ], style={'height': '100vh', 'display': 'flex', 'position': 'relative'})
 
         @self.app.callback(
             Output('explorer-content', 'children'),
@@ -352,9 +367,14 @@ class MainWindow(FileSystemEventHandler):
             if isinstance(show_primary_radiation_direction, list):
                 self.plotter.show_primary_radiation_direction = ('draw-primary-radiation-direction' in show_primary_radiation_direction)
             
+            field = FieldStore.load(selected_file)
+            self.vertical_slice_height = vertical_slice_height
+            if self.vertical_slice_height is not None and isinstance(field, CartesianRadiationField):
+                field: CartesianRadiationField = field
+                self.vertical_slice_height = vertical_slice_height * field.get_field_dimensions().y
             # Replace with logic to generate Plotly figure based on selected files and other inputs
             fig = self.plotter.plot_field(
-                FieldStore.load(selected_file),
+                field,
                 title=os.path.basename(selected_file),
                 metadata=FieldStore.load_metadata(selected_file),
                 vertical_slice_height=vertical_slice_height
@@ -393,6 +413,44 @@ class MainWindow(FileSystemEventHandler):
                 file = 'mocked_path.png'  # Mocked file save dialog
                 self.viewer_plot.save_figure(file)
             return 0
+
+        @self.app.callback(
+            Output('overlay', 'style'),
+            Output('overlay', 'children'),
+            Input('viewer-graph', 'hoverData')
+        )
+        def display_overlay(hover_data):
+            if not hover_data or 'points' not in hover_data:
+                return {'display': 'none'}, None  # Hide overlay when mouse leaves the graph
+
+            point = hover_data['points'][0]
+            x, y = point['x'], point['y']
+            z = self.vertical_slice_height - self.plotter.current_field.get_field_dimensions().y / 2.0
+
+            # Generate the spectrum figure using RadSimPlotter
+            spectrum_fig = self.plotter.plot_spectrum((x, y, z))
+
+            if spectrum_fig is None:
+                return {'display': 'none'}, None  # Hide overlay if no spectrum figure is generated
+
+            # Convert the figure to HTML (or a suitable representation)
+            spectrum_html = dcc.Graph(figure=spectrum_fig, style={'width': '400px', 'height': '200px'})
+
+            # Position the overlay near the mouse cursor
+            overlay_style = {
+                'position': 'absolute',
+                'top': f"{hover_data['points'][0]['y']}px",
+                'right': f"{hover_data['points'][0]['x']}px",
+                'backgroundColor': '#2e2e2e',
+                'color': '#ffffff',
+                'padding': '10px',
+                'border': '1px solid #ffffff',
+                'borderRadius': '5px',
+                'display': 'block',
+                'zIndex': 1000
+            }
+
+            return overlay_style, spectrum_html
 
     def parse_dataset(self):
         self.enqueue_gui_call(lambda : self.window['-File-Count-'].update(value="Fields Count: " + str(len(self.file_list))))
