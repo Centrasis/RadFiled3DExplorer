@@ -5,6 +5,7 @@ import torch
 import os
 from enum import Enum
 from typing import Union
+from logging import getLogger
 
 
 class PlotInformation(Enum):
@@ -224,6 +225,16 @@ class RadSimPlotter:
             else:
                 overall_data += layers_data
         
+        if overall_data is None and len(field.get_channels()) == 1:
+            getLogger().warning("No data found in field, using first channel")
+            overall_data_channel = field.get_channels()[0][1]
+            if len(overall_data_channel.get_layers()) == 1:
+                overall_data = overall_data_channel.get_layer_as_ndarray(overall_data_channel.get_layers()[0])
+                found_components = 1
+            else:
+                getLogger().error("Field contains multiple layers, but not in the known format")
+                raise ValueError("Field contains multiple layers, but not in the known format")
+
         overall_data /= found_components
         return overall_data
 
