@@ -163,6 +163,8 @@ class RadSimPlotter:
         hist_data: np.ndarray = None
         voxel: HistogramVoxel = None
         for component in component_names:
+            if not self.current_field.has_channel(component):
+                continue
             if hist_data is None:
                 voxel = self.current_field.get_channel(component).get_voxel_by_coord("spectrum", xyz[0], xyz[1], xyz[2])
                 hist_data = voxel.get_histogram()
